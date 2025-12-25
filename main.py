@@ -1,3 +1,5 @@
+from turtledemo.penrose import start
+
 import pygame
 import random
 import copy
@@ -27,6 +29,11 @@ class Othello:
         self.screen = pygame.display.set_mode((1000,600)) # found a more optimal screen size
         pygame.display.set_caption('Othello')
 
+        self.player1 = 1
+        self.player2 = -1
+
+        self.currentPlayer = 1
+
         self.columns = 8
         self.rows = 8
 
@@ -49,6 +56,13 @@ class Othello:
                 if event.button == 3:
                     self.grid.printGameLogicBoard()
 
+                if event.button == 1:
+                    x,y = pygame.mouse.get_pos()
+                    x,y = (x-60)//60 , (y-60)//60
+
+                    self.grid.insertDisc(self.grid.gridLogic, self.currentPlayer, y, x)
+                    self.currentPlayer *= -1
+
 
     def update(self):
         pass
@@ -70,6 +84,8 @@ class Board:
         self.blackdisc = loadImages('assets/BlackDisc.png', size)
         self.transition = loadImages('assets/Transition.png', size)
         self.bg = self.loadBackgroundImages()
+
+        self.discs = {}
 
         self.gridBg = self.createbgimg()
 
@@ -113,7 +129,7 @@ class Board:
                         row.append('A2')
             gridBg.append(row)
 
-        image = pygame.Surface((960,960))
+        image = pygame.Surface((720,720))
         for j, row in enumerate(gridBg):
             for i, img in enumerate(row):
                 image.blit(self.bg[img],(i*self.size[0], j*self.size[1]))
@@ -123,10 +139,17 @@ class Board:
     def drawBoard(self, window):
         window.blit(self.gridBg, (0,0))
 
+        for disc in self.discs.values():
+            disc.draw(window)
+
 
     def regenGrid(self, rows, columns):
         """Generate an empty grid for logic use"""
         grid = [[0 for x in range(columns)] for y in range(rows)]
+        self.insertDisc(grid, 1, 3,3)
+        self.insertDisc(grid, -1, 3,4)
+        self.insertDisc(grid, 1, 4,4)
+        self.insertDisc(grid, -1, 4,3)
 
         return grid
 
@@ -135,11 +158,34 @@ class Board:
         print(end='  | ')
         print(*letters[0:self.x], sep=' | ', end=' |\n')
         for i, row in enumerate(self.gridLogic):
-            print(i + 1, end=' | ')
+            line = f'{i} |'.ljust(3, " ")
             for item in row:
-                print(item, end=' | ')
-            print()
+                line += f"{item}".center(3, " ") + '|'
+            print(line)
         print()
+
+    def insertDisc(self, grid, curplayer, y, x):
+        discImage = self.whitedisc if curplayer == 1 else self.blackdisc
+        self.discs[(y,x)] = Disc(curplayer, y, x, discImage, self.GAME)
+        grid[y][x] = self.discs[(y,x)].player
+
+
+class Disc:
+    def __init__(self, player, gridX, gridY, image, main):
+        self.player = player
+        self.gridX = gridX
+        self.gridY = gridY
+        self.posX = 60 + (gridY * 60)
+        self.posY = 60 + (gridX * 60)
+        self.GAME = main
+
+        self.image = image
+
+    def transition(self):
+        pass
+
+    def draw(self, window):
+        window.blit(self.image, (self.posX, self.posY))
 
 
 if __name__ == '__main__':
