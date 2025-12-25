@@ -5,6 +5,23 @@ import random
 import copy
 
 # Utility Functions
+def directions(x, y, minX=0, minY=0, maxX=7, maxY=7):
+    """Check to determine which directions are valid from current cell"""
+    validdirections = []
+    if x != minX: validdirections.append((x-1, y))
+    if x != minX and y != minY: validdirections.append((x-1, y-1))
+    if x != minX and y != maxY: validdirections.append((x-1, y+1))
+
+    if x!= maxX: validdirections.append((x+1, y))
+    if x != maxX and y != minY: validdirections.append((x+1, y-1))
+    if x != maxX and y != maxY: validdirections.append((x+1, y+1))
+
+    if y != minY: validdirections.append((x, y-1))
+    if y != maxY: validdirections.append((x, y+1))
+
+    return validdirections
+
+
 def loadImages(path, size):
     """Load an image into the game, and scale the image"""
 
@@ -59,9 +76,13 @@ class Othello:
                 if event.button == 1:
                     x,y = pygame.mouse.get_pos()
                     x,y = (x-60)//60 , (y-60)//60
-
-                    self.grid.insertDisc(self.grid.gridLogic, self.currentPlayer, y, x)
-                    self.currentPlayer *= -1
+                    validCells = self.grid.findAvailableMoves(self.grid.gridLogic, self.currentPlayer)
+                    if not validCells:
+                        pass
+                    else:
+                        if (y, x) in validCells:
+                            self.grid.insertDisc(self.grid.gridLogic, self.currentPlayer, y, x)
+                            self.currentPlayer *= -1
 
 
     def update(self):
@@ -142,6 +163,10 @@ class Board:
         for disc in self.discs.values():
             disc.draw(window)
 
+        availableMoves = self.findAvailableMoves(self.gridLogic, self.GAME.currentPlayer)
+        for move in availableMoves:
+            pygame.draw.circle(window, 'White', (60 + (move[1]*60) + 30, 60 + (move[0]*60) + 30), 10, 5)
+
 
     def regenGrid(self, rows, columns):
         """Generate an empty grid for logic use"""
@@ -163,6 +188,82 @@ class Board:
                 line += f"{item}".center(3, " ") + '|'
             print(line)
         print()
+
+    def findValidCells(self, grid, curPlayer):
+        """Preforms a check to find all empty cells that are adjacent to the opposing player"""
+        validCellToClick = []
+        for gridX, row in enumerate(grid):
+            for gridY, col in enumerate(row):
+                if grid[gridX][gridY] != 0:
+                    continue
+                DIRECTIONS = directions(gridX, gridY, 0, 0, self.x-1, self.y-1) # might be self.y -1, self.x -1
+
+                for direction in DIRECTIONS:
+                    dirX, dirY = direction
+                    checkedCell = grid[dirX][dirY]
+
+                    if checkedCell == 0 or checkedCell == curPlayer:
+                        continue
+
+                    if (gridX, gridY) in validCellToClick:
+                        continue
+
+                    validCellToClick.append((gridX,gridY))
+
+        return validCellToClick
+
+    def flankableDiscs(self, x, y, grid, player):
+        surroundCells = directions(x, y, 0, 0, self.x-1, self.y-1) # might be self.y -1, self.x -1
+        if len(surroundCells) == 0:
+            return []
+
+        flankableDiscs = []
+
+        for checkCell in surroundCells:
+            checkX, checkY = checkCell
+            difX, difY = checkX - x, checkY - y
+            currentLine = []
+
+            RUN = True
+            while RUN:
+                if grid[checkX][checkY] == player *-1:
+                    currentLine.append((checkX, checkY))
+                elif grid[checkX][checkY] == player:
+                    RUN = False
+                    break
+                elif grid[checkX][checkY] == 0:
+                    currentLine.clear()
+                    RUN = False
+                checkX += difX
+                checkY += difY
+
+                if checkX < 0 or checkX > self.x-1 or checkY < 0 or checkY > self.y-1:
+                    currentLine.clear()
+                    RUN = False
+
+            if len(currentLine) > 0:
+                flankableDiscs.extend(currentLine)
+
+        return flankableDiscs
+
+
+    def findAvailableMoves(self, grid, currentPlayer):
+        """Takes the list of available cells and checks each to see if they are playable"""
+        validCells = self.findValidCells(grid,currentPlayer)
+        playableCells = []
+
+        for cell in validCells:
+            x,y = cell
+            if cell in playableCells:
+                continue
+
+            outflankDiscs = self.flankableDiscs(x, y, grid, currentPlayer)
+
+            # if len(outflankDiscs) > 0 and cell not in playableCells:
+            if len(outflankDiscs) > 0:
+                playableCells.append(cell)
+
+        return playableCells
 
     def insertDisc(self, grid, curplayer, y, x):
         discImage = self.whitedisc if curplayer == 1 else self.blackdisc
